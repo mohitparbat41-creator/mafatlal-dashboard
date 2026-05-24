@@ -60,12 +60,12 @@ export function UserFormSheet({ user, open, onOpenChange }: UserFormSheetProps) 
 
   const form = useAppForm({
     defaultValues: {
-      first_name: user?.first_name ?? '',
-      last_name: user?.last_name ?? '',
-      email: user?.email ?? '',
-      phone: user?.phone ?? '',
+      first_name: (user as any)?.first_name ?? '',
+      last_name: (user as any)?.last_name ?? '',
+      email: (user as any)?.email ?? '',
+      phone: (user as any)?.phone ?? '',
       role: user?.role ?? '',
-      status: user?.status ?? 'Active'
+      status: (user as any)?.status ?? 'Active'
     } as UserFormValues,
     validators: {
       onSubmit: userSchema
