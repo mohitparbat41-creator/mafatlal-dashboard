@@ -16,8 +16,8 @@ const META_THEME_COLORS = {
 };
 
 export const metadata: Metadata = {
-  title: 'Next Shadcn',
-  description: 'Basic dashboard with Next.js and Shadcn'
+  title: 'MIL Business Snapshot',
+  description: 'Internal operations platform for Mafatlal Industries Limited'
 };
 
 export const viewport: Viewport = {

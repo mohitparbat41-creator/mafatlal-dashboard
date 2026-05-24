@@ -6,7 +6,7 @@ import SearchInput from '../search-input';
 import { ThemeSelector } from '../themes/theme-selector';
 import { ThemeModeToggle } from '../themes/theme-mode-toggle';
 import CtaGithub from './cta-github';
-import { NotificationCenter } from '@/features/notifications/components/notification-center';
+import { SystemNotificationBell } from '@/features/notifications/components/system-notification-bell';
 
 export default function Header() {
   return (
@@ -26,7 +26,7 @@ export default function Header() {
         <div className='hidden sm:block'>
           <ThemeSelector />
         </div>
-        <NotificationCenter />
+        <SystemNotificationBell />
       </div>
     </header>
   );

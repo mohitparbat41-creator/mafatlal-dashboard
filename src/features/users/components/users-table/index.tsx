@@ -37,10 +37,7 @@ export function UsersTable() {
     columns,
     pageCount,
     shallow: true,
-    debounceMs: 500,
-    initialState: {
-      columnPinning: { right: ['actions'] }
-    }
+    debounceMs: 500
   });
 
   return (

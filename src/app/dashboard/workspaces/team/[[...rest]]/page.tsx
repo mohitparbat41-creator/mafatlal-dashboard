@@ -1,17 +1,15 @@
-'use client';
-
 import PageContainer from '@/components/layout/page-container';
-import { OrganizationProfile } from '@clerk/nextjs';
-import { teamInfoContent } from '@/config/infoconfig';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function TeamPage() {
   return (
-    <PageContainer
-      pageTitle='Team Management'
-      pageDescription='Manage your workspace team, members, roles, security and more.'
-      infoContent={teamInfoContent}
-    >
-      <OrganizationProfile />
+    <PageContainer>
+      <Card className='rounded-xl border shadow-sm'>
+        <CardHeader>
+          <CardTitle>Team Management</CardTitle>
+          <CardDescription>Team management is not available in this version.</CardDescription>
+        </CardHeader>
+      </Card>
     </PageContainer>
   );
 }

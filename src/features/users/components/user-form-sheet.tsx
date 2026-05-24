@@ -14,6 +14,8 @@ import {
 import { Icons } from '@/components/icons';
 import { useMutation } from '@tanstack/react-query';
 import { createUserMutation, updateUserMutation } from '../api/mutations';
+import { userKeys } from '../api/queries';
+import { getQueryClient } from '@/lib/query-client';
 import type { User } from '../api/types';
 import { toast } from 'sonner';
 import * as z from 'zod';
@@ -38,6 +40,7 @@ export function UserFormSheet({ user, open, onOpenChange }: UserFormSheetProps) 
   const createMutation = useMutation({
     ...createUserMutation,
     onSuccess: () => {
+      getQueryClient().invalidateQueries({ queryKey: userKeys.all });
       toast.success('User created successfully');
       onOpenChange(false);
       form.reset();
@@ -48,6 +51,7 @@ export function UserFormSheet({ user, open, onOpenChange }: UserFormSheetProps) 
   const updateMutation = useMutation({
     ...updateUserMutation,
     onSuccess: () => {
+      getQueryClient().invalidateQueries({ queryKey: userKeys.all });
       toast.success('User updated successfully');
       onOpenChange(false);
     },
@@ -107,10 +111,9 @@ export function UserFormSheet({ user, open, onOpenChange }: UserFormSheetProps) 
                 <FormTextField
                   name='last_name'
                   label='Last Name'
-                  required
                   placeholder='Doe'
                   validators={{
-                    onBlur: z.string().min(2, 'Last name must be at least 2 characters')
+                    onBlur: z.string().optional()
                   }}
                 />
               </div>

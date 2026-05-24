@@ -24,25 +24,41 @@ import {
   SidebarMenuSubItem,
   SidebarRail
 } from '@/components/ui/sidebar';
-import { UserAvatarProfile } from '@/components/user-avatar-profile';
 import { navGroups } from '@/config/nav-config';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import { useOrganization, useUser } from '@clerk/nextjs';
-import { useFilteredNavGroups } from '@/hooks/use-nav';
-import { SignOutButton } from '@clerk/nextjs';
+import { useAuth } from '@/components/providers/supabase-auth-provider';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 import { Icons } from '../icons';
-import { OrgSwitcher } from '../org-switcher';
 
 export default function AppSidebar() {
   const pathname = usePathname();
   const { isOpen } = useMediaQuery();
-  const { user } = useUser();
-  const { organization } = useOrganization();
+  const { user, role, signOut } = useAuth();
   const router = useRouter();
-  const filteredGroups = useFilteredNavGroups(navGroups);
+
+  // Filter nav groups based on role
+  const filteredGroups = React.useMemo(() => {
+    if (role === 'sales') {
+      // Sales users only see items that don't start with /dashboard
+      return navGroups
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) => {
+            // Keep items that are for sales (e.g., /submit)
+            if (item.url.startsWith('/submit')) return true;
+            // Hide all dashboard items
+            if (item.url.startsWith('/dashboard') || item.url === '#') return false;
+            return true;
+          })
+        }))
+        .filter((group) => group.items.length > 0);
+    }
+    // Management sees everything
+    return navGroups;
+  }, [role]);
 
   React.useEffect(() => {
     // Side effects based on sidebar state changes
@@ -50,8 +66,15 @@ export default function AppSidebar() {
 
   return (
     <Sidebar collapsible='icon'>
-      <SidebarHeader className='group-data-[collapsible=icon]:pt-4'>
-        <OrgSwitcher />
+      <SidebarHeader className='bg-transparent p-0 group-data-[collapsible=icon]:pt-2'>
+        {/* ── MIL Company Branding ── */}
+        <div className='flex items-center justify-center bg-transparent px-2 py-3'>
+          <img 
+            src="/logo.png" 
+            alt="Mafatlal Logo" 
+            className="h-16 w-auto object-contain bg-transparent" 
+          />
+        </div>
       </SidebarHeader>
       <SidebarContent className='overflow-x-hidden'>
         {filteredGroups.map((group) => (
@@ -118,9 +141,17 @@ export default function AppSidebar() {
                   size='lg'
                   className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
                 >
-                  {user && (
-                    <UserAvatarProfile className='h-8 w-8 rounded-lg' showInfo user={user} />
-                  )}
+                  <div className='bg-muted flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg'>
+                    <Icons.user className='size-4' />
+                  </div>
+                  <div className='grid flex-1 text-left text-sm leading-tight'>
+                    <span className='truncate font-medium'>
+                      {user?.email?.split('@')[0] || 'User'}
+                    </span>
+                    <span className='text-muted-foreground truncate text-xs capitalize'>
+                      {role || 'Loading...'}
+                    </span>
+                  </div>
                   <Icons.chevronsDown className='ml-auto size-4' />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -131,34 +162,34 @@ export default function AppSidebar() {
                 sideOffset={4}
               >
                 <DropdownMenuLabel className='p-0 font-normal'>
-                  <div className='px-1 py-1.5'>
-                    {user && (
-                      <UserAvatarProfile className='h-8 w-8 rounded-lg' showInfo user={user} />
-                    )}
+                  <div className='flex items-center gap-2 px-1 py-1.5 text-left text-sm'>
+                    <div className='bg-muted flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg'>
+                      <Icons.user className='size-4' />
+                    </div>
+                    <div className='grid flex-1 text-left text-sm leading-tight'>
+                      <span className='truncate font-semibold'>
+                        {user?.email || 'User'}
+                      </span>
+                      <span className='text-muted-foreground truncate text-xs capitalize'>
+                        {role || '—'}
+                      </span>
+                    </div>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
 
                 <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>
-                    <Icons.account className='mr-2 h-4 w-4' />
-                    Profile
-                  </DropdownMenuItem>
-                  {organization && (
-                    <DropdownMenuItem onClick={() => router.push('/dashboard/billing')}>
-                      <Icons.creditCard className='mr-2 h-4 w-4' />
-                      Billing
+                  {role === 'management' && (
+                    <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>
+                      <Icons.account className='mr-2 h-4 w-4' />
+                      Profile
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={() => router.push('/dashboard/notifications')}>
-                    <Icons.notification className='mr-2 h-4 w-4' />
-                    Notifications
-                  </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void signOut()}>
                   <Icons.logout className='mr-2 h-4 w-4' />
-                  <SignOutButton redirectUrl='/auth/sign-in' />
+                  Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
