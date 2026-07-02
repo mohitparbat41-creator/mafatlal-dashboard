@@ -32,12 +32,15 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 import { Icons } from '../icons';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ExecutiveSettingsPanel } from '@/features/executive/components/executive-settings-panel';
 
 export default function AppSidebar() {
   const pathname = usePathname();
   const { isOpen } = useMediaQuery();
   const { user, role, signOut } = useAuth();
   const router = useRouter();
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
 
   // Filter nav groups based on role
   const filteredGroups = React.useMemo(() => {
@@ -69,10 +72,10 @@ export default function AppSidebar() {
       <SidebarHeader className='bg-transparent p-0 group-data-[collapsible=icon]:pt-2'>
         {/* ── MIL Company Branding ── */}
         <div className='flex items-center justify-center bg-transparent px-2 py-3'>
-          <img 
-            src="/logo.png" 
-            alt="Mafatlal Logo" 
-            className="h-16 w-auto object-contain bg-transparent" 
+          <img
+            src='/logo.png'
+            alt='Mafatlal Logo'
+            className='h-16 w-auto object-contain bg-transparent'
           />
         </div>
       </SidebarHeader>
@@ -134,6 +137,14 @@ export default function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          {role === 'management' && (
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip='Settings' onClick={() => setSettingsOpen(true)}>
+                <Icons.settings />
+                <span>Settings</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -167,9 +178,7 @@ export default function AppSidebar() {
                       <Icons.user className='size-4' />
                     </div>
                     <div className='grid flex-1 text-left text-sm leading-tight'>
-                      <span className='truncate font-semibold'>
-                        {user?.email || 'User'}
-                      </span>
+                      <span className='truncate font-semibold'>{user?.email || 'User'}</span>
                       <span className='text-muted-foreground truncate text-xs capitalize'>
                         {role || '—'}
                       </span>
@@ -197,6 +206,15 @@ export default function AppSidebar() {
         </SidebarMenu>
       </SidebarFooter>
       <SidebarRail />
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className='sm:max-w-sm'>
+          <DialogHeader>
+            <DialogTitle>Dashboard Settings</DialogTitle>
+          </DialogHeader>
+          <ExecutiveSettingsPanel />
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   );
 }

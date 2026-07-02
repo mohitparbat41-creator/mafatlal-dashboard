@@ -11,12 +11,10 @@ import {
   Cell,
   LabelList
 } from 'recharts';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatPercent } from '@/lib/format';
+import { departmentHead } from '@/features/submit/api/types';
+import { chartThemeClass } from './chart-theme';
 
 export interface DeptRankingEntry {
   department: string;
@@ -29,13 +27,13 @@ interface ExecutiveDeptRankingProps {
 
 const getBarColor = (pct: number) => {
   if (pct >= 100) return '#22c55e'; // green-500
-  if (pct >= 75) return '#3b82f6';  // blue-500
-  if (pct >= 50) return '#f59e0b';  // amber-500
-  return '#ef4444';                  // red-500
+  if (pct >= 75) return '#3b82f6'; // blue-500
+  if (pct >= 50) return '#f59e0b'; // amber-500
+  return '#ef4444'; // red-500
 };
 
 // Truncate long department names cleanly
-const truncateName = (name: string, maxLen = 16) => {
+const truncateName = (name: string, maxLen = 22) => {
   if (name.length <= maxLen) return name;
   return name.slice(0, maxLen) + '…';
 };
@@ -46,10 +44,13 @@ function CustomTooltip({ active, payload }: any) {
   return (
     <div className='rounded-lg border bg-popover px-3 py-2 text-xs shadow-xl'>
       <p className='font-semibold text-popover-foreground'>{entry.department}</p>
+      {departmentHead(entry.department) && (
+        <p className='text-[10px] text-muted-foreground'>{departmentHead(entry.department)}</p>
+      )}
       <p className='mt-1 text-muted-foreground'>
         Achievement:{' '}
         <span className='font-mono font-semibold text-popover-foreground'>
-          {entry.achievementPct.toFixed(1)}%
+          {formatPercent(entry.achievementPct)}
         </span>
       </p>
     </div>
@@ -75,16 +76,14 @@ export function ExecutiveDeptRanking({ data }: ExecutiveDeptRankingProps) {
   }
 
   // Sort descending by achievement %
-  const sortedData = [...data].sort(
-    (a, b) => b.achievementPct - a.achievementPct
-  );
+  const sortedData = [...data].sort((a, b) => b.achievementPct - a.achievementPct);
 
-  // Dynamic chart height: at least 280px, 38px per dept
-  const chartHeight = Math.max(280, sortedData.length * 38);
+  // Dynamic chart height: at least 300px, 44px per dept (taller bars / roomier rows)
+  const chartHeight = Math.max(300, sortedData.length * 44);
 
-  // X-axis domain: cap at max+15 to give label space, minimum 125%
+  // X-axis domain: cap at max+15% to give label space, minimum 120%
   const maxPct = Math.max(...sortedData.map((d) => d.achievementPct));
-  const xMax = Math.max(maxPct * 1.2, 125);
+  const xMax = Math.max(maxPct * 1.15, 120);
 
   return (
     <Card className='shadow-sm transition-shadow hover:shadow-md'>
@@ -93,62 +92,52 @@ export function ExecutiveDeptRanking({ data }: ExecutiveDeptRankingProps) {
           Department Performance (% Achievement)
         </CardTitle>
       </CardHeader>
-      <CardContent className='pt-0 pr-2'>
-        <div style={{ height: chartHeight }} className='w-full'>
+      <CardContent className='pt-0'>
+        <div style={{ height: chartHeight }} className={`w-full ${chartThemeClass}`}>
           <ResponsiveContainer width='100%' height='100%'>
             <BarChart
               data={sortedData}
               layout='vertical'
-              margin={{ top: 4, right: 52, left: 4, bottom: 4 }}
+              margin={{ top: 4, right: 56, left: 8, bottom: 4 }}
             >
-              <CartesianGrid
-                strokeDasharray='3 3'
-                horizontal={false}
-                stroke='hsl(var(--border))'
-              />
+              <CartesianGrid strokeDasharray='3 3' horizontal={false} />
               <XAxis
                 type='number'
                 domain={[0, xMax]}
-                tickFormatter={(v) => `${v}%`}
+                tickFormatter={(v) => formatPercent(v)}
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                tickCount={5}
+                tick={{ fontSize: 11 }}
+                tickCount={6}
               />
               <YAxis
                 type='category'
                 dataKey='department'
-                width={120}
+                width={140}
                 tickFormatter={(name) => truncateName(name)}
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10.5 }}
+                tick={{ fontSize: 11.5 }}
               />
-              <Tooltip
-                content={<CustomTooltip />}
-                cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
-              />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: '#94a3b8', opacity: 0.15 }} />
               <Bar
                 dataKey='achievementPct'
                 radius={[0, 4, 4, 0]}
-                barSize={18}
+                barSize={22}
                 animationDuration={700}
                 animationEasing='ease-out'
                 isAnimationActive={true}
               >
                 {sortedData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={getBarColor(entry.achievementPct)}
-                  />
+                  <Cell key={`cell-${index}`} fill={getBarColor(entry.achievementPct)} />
                 ))}
                 <LabelList
                   dataKey='achievementPct'
                   position='right'
-                  formatter={(v: number) => `${v.toFixed(1)}%`}
+                  formatter={(v: number) => formatPercent(v)}
                   style={{
-                    fill: 'hsl(var(--foreground))',
-                    fontSize: 10,
+                    fill: 'var(--foreground)',
+                    fontSize: 11,
                     fontWeight: 700
                   }}
                 />

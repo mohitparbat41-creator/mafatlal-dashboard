@@ -39,3 +39,20 @@ export interface SystemNotification {
   created_at: string;
   is_active: boolean;
 }
+
+export interface RemarkEntry {
+  record_id: string;
+  department_id: string;
+  department_name: string;
+  week_number: number;
+  user_email: string;
+  remarks: string;
+  timestamp: string;
+}
+
+export interface HealthStatus {
+  ok: boolean;
+  latencyMs: number;
+  checkedAt: string;
+  error?: string;
+}

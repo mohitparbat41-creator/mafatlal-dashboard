@@ -4,9 +4,11 @@
 /node_modules
 /.pnp
 .pnp.js
-package-lock.json
+# package-lock.json is intentionally committed so Vercel installs with npm
+# (the project's .npmrc uses legacy-peer-deps / shamefully-hoist, which only npm honors).
 yarn.lock
 pnpm-lock.yaml
+bun.lock
 
 # testing
 /coverage
@@ -30,6 +32,7 @@ yarn-error.log*
 # local env files
 .env*
 .env*.local
+!.env.example
 
 # vercel
 .vercel

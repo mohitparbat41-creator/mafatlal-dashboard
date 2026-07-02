@@ -1,0 +1,67 @@
+-- ============================================================
+-- MIL Business Snapshot — "Current Outstanding" as an independent field
+-- Run this in the Supabase SQL Editor (Dashboard → SQL Editor).
+--
+-- Business change: Outstanding is NO LONGER sales − collection. It is a value
+-- the Sales Head enters each week (the current ERP outstanding balance), stored
+-- as FULL RUPEES at full precision. The dashboard uses SUM(outstanding_amount).
+-- ============================================================
+
+-- 1) Add the independent Outstanding column to sales_submissions.
+--    Full rupees, never derived. (Only this table is modified.)
+alter table public.sales_submissions
+  add column if not exists outstanding_amount numeric not null default 0;
+
+-- 2) Existing rows are test data and were entered in the OLD (Crore-scale) unit.
+--    The app now stores/format full rupees, so clear them to avoid mixed units.
+--    (Confirmed: existing data is disposable.) Uncomment to run:
+-- truncate table public.sales_submissions;
+
+-- ------------------------------------------------------------
+-- 3) Update v_executive_summary so outstanding_amount comes from
+--    SUM(outstanding_amount) instead of any sales/collection formula.
+--
+--    The current view definition is NOT in this repo, so I can't hand you the
+--    final CREATE OR REPLACE blind. Grab the current definition:
+--
+--        select pg_get_viewdef('public.v_executive_summary', true);
+--
+--    In that definition, find the column aliased `outstanding_amount` (today it
+--    is almost certainly a derived expression such as
+--        sum(ss.sales_achieved) - sum(ss.collection_amount)   -- OLD
+--    or similar) and replace JUST that expression with:
+--
+--        sum(ss.outstanding_amount) as outstanding_amount     -- NEW
+--
+--    (use whatever alias the view already gives sales_submissions). Leave
+--    total_sales_achieved / total_collection_amount and all joins unchanged.
+--    Then run:
+--
+--        create or replace view public.v_executive_summary as
+--        <the full updated select>;
+--
+--    Paste me the output of pg_get_viewdef above and I'll return the exact,
+--    ready-to-run CREATE OR REPLACE VIEW with only this one line changed.
+-- ------------------------------------------------------------
+
+-- ------------------------------------------------------------
+-- 4) IMPORTANT — Outstanding is a point-in-time SNAPSHOT, not transactional.
+--    Per (department, week) the view value is simply that week's entered balance
+--    (so `sum(outstanding_amount)` within the dept/week group is fine — it's one
+--    submission). But any TOTAL ACROSS WEEKS must NOT sum weeks (double-counts).
+--    For a company-wide / multi-week "current outstanding", take the LATEST week
+--    per department, then sum those latest values:
+--
+--      select sum(latest.outstanding_amount) as total_outstanding
+--      from (
+--        select distinct on (department_id)
+--               department_id, outstanding_amount
+--        from public.sales_submissions
+--        -- where timestamp between :from and :to    -- apply the selected range
+--        order by department_id, timestamp desc       -- latest submission wins
+--      ) latest;
+--
+--    e.g. Corporate W1 8.2 / W2 8.9 / W3 8.4  ->  8.4 Cr (latest), never 25.5 Cr.
+--    The dashboard already does exactly this client-side; mirror it in any SQL
+--    view or report that totals outstanding (KPIs, department summaries, etc.).
+-- ------------------------------------------------------------

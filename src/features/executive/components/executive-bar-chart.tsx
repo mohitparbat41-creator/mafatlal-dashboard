@@ -11,13 +11,9 @@ import {
   Brush,
   Tooltip
 } from 'recharts';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { chartThemeClass } from './chart-theme';
+import { formatTargetCrores } from '@/lib/format';
 
 interface ChartDataPoint {
   week_number: number;
@@ -30,21 +26,17 @@ interface ExecutiveBarChartProps {
   data: ChartDataPoint[];
 }
 
-// Format a raw number as Crore/Lakh label for Y-axis ticks
-// The values from DB are already in Cr units (e.g., 29, 32 = ₹29 Cr, ₹32 Cr)
-const formatYAxis = (value: number) => {
-  if (value >= 100) return `${value.toFixed(0)}`;
-  if (value >= 10) return `${value.toFixed(0)}`;
-  return `${value.toFixed(1)}`;
-};
+// Chart data is in Crores (target's native unit; sales converted upstream).
+const formatYAxis = (value: number) =>
+  value >= 10 ? `${Math.round(value)}` : `${parseFloat(value.toFixed(1))}`;
 
 const formatLabel = (value: number) => {
   if (value === 0) return '';
-  return `${parseFloat(value.toFixed(1))}`;
+  return `${parseFloat(value.toFixed(2))}`;
 };
 
 // Custom tooltip for rich hover experience
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
   const dataPoint = payload[0]?.payload;
   return (
@@ -62,7 +54,7 @@ function CustomTooltip({ active, payload, label }: any) {
             {entry.dataKey === 'total_sales_achieved' ? 'Sales' : 'Target'}:
           </span>
           <span className='font-mono font-semibold text-popover-foreground'>
-            ₹{parseFloat(entry.value.toFixed(2))} Cr
+            {formatTargetCrores(entry.value)}
           </span>
         </div>
       ))}
@@ -80,10 +72,8 @@ export function ExecutiveBarChart({ data }: ExecutiveBarChartProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className='flex h-[380px] items-center justify-center'>
-            <p className='text-sm text-muted-foreground'>
-              No data available for this period
-            </p>
+          <div className='flex h-[420px] items-center justify-center'>
+            <p className='text-sm text-muted-foreground'>No data available for this period</p>
           </div>
         </CardContent>
       </Card>
@@ -106,7 +96,7 @@ export function ExecutiveBarChart({ data }: ExecutiveBarChartProps) {
             Sales Achieved (Cr)
           </span>
           <span className='flex items-center gap-1.5'>
-            <span className='inline-block h-0.5 w-5 border-t-2 border-dashed border-slate-400' />
+            <span className='inline-block h-0.5 w-5 border-t-2 border-dashed border-slate-400 dark:border-slate-500' />
             Target (Cr)
           </span>
           {showBrush && (
@@ -117,25 +107,18 @@ export function ExecutiveBarChart({ data }: ExecutiveBarChartProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className='pt-0'>
-        <div className='h-[380px] w-full'>
+        <div className={`h-[420px] w-full ${chartThemeClass}`}>
           <ResponsiveContainer width='100%' height='100%'>
             <LineChart
               data={data}
-              margin={{ top: 22, right: 16, left: 0, bottom: showBrush ? 60 : 80 }}
+              margin={{ top: 24, right: 20, left: 4, bottom: showBrush ? 60 : 80 }}
             >
-              <CartesianGrid
-                strokeDasharray='3 3'
-                vertical={false}
-                stroke='hsl(var(--border))'
-              />
+              <CartesianGrid strokeDasharray='3 3' vertical={false} />
               <XAxis
                 dataKey='date_range'
                 axisLine={false}
                 tickLine={false}
-                tick={{
-                  fill: 'hsl(var(--muted-foreground))',
-                  fontSize: 10
-                }}
+                tick={{ fontSize: 10 }}
                 angle={-40}
                 textAnchor='end'
                 interval={0}
@@ -145,11 +128,8 @@ export function ExecutiveBarChart({ data }: ExecutiveBarChartProps) {
                 tickFormatter={formatYAxis}
                 axisLine={false}
                 tickLine={false}
-                tick={{
-                  fill: 'hsl(var(--muted-foreground))',
-                  fontSize: 11
-                }}
-                width={36}
+                tick={{ fontSize: 11 }}
+                width={40}
               />
               <Tooltip content={<CustomTooltip />} />
 
@@ -174,7 +154,7 @@ export function ExecutiveBarChart({ data }: ExecutiveBarChartProps) {
                   position='top'
                   formatter={formatLabel}
                   style={{
-                    fill: 'hsl(var(--foreground))',
+                    fill: 'var(--foreground)',
                     fontSize: 9,
                     fontWeight: 600
                   }}
@@ -200,8 +180,8 @@ export function ExecutiveBarChart({ data }: ExecutiveBarChartProps) {
                 <Brush
                   dataKey='date_range'
                   height={20}
-                  stroke='#cbd5e1'
-                  fill='#f8fafc'
+                  stroke='#94a3b8'
+                  fill='transparent'
                   travellerWidth={4}
                   startIndex={0}
                   endIndex={brushEndIndex}

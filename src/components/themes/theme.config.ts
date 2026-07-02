@@ -6,7 +6,7 @@ export const DEFAULT_THEME = 'vercel';
 
 export const THEMES = [
   {
-    name: 'Claude',
+    name: 'Desert Rose',
     value: 'claude'
   },
   {

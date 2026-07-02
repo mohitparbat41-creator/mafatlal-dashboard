@@ -18,6 +18,14 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         shortcut: ['s', 's'],
         items: []
+      },
+      {
+        title: 'Submission History',
+        url: '/submit/history',
+        icon: 'forms',
+        isActive: false,
+        shortcut: ['s', 'h'],
+        items: []
       }
     ]
   },
@@ -35,7 +43,7 @@ export const navGroups: NavGroup[] = [
       {
         title: 'Broadcast',
         url: '/dashboard/broadcast',
-        icon: 'send',
+        icon: 'notification',
         shortcut: ['b', 'b'],
         isActive: false,
         items: []

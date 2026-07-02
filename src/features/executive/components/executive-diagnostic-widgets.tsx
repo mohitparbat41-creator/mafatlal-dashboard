@@ -9,12 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -31,6 +26,9 @@ import {
   IconArrowRight
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
+import { formatPercent, formatINRValue } from '@/lib/format';
+import { chartThemeClass } from './chart-theme';
+import { departmentHead } from '@/features/submit/api/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -65,15 +63,8 @@ interface ExecutiveDiagnosticWidgetsProps {
 
 // ─── Utilities ───────────────────────────────────────────────────────────
 
-/**
- * Values are already in Crores units from the DB/useMemo.
- */
-const formatCrShort = (value: number) => {
-  if (value === 0) return '0';
-  if (value >= 1) return `${value.toFixed(2)} Cr`;
-  if (value > 0) return `${(value * 100).toFixed(2)} L`;
-  return '0';
-};
+// Full-rupee outstanding → compact ₹/L/Cr value.
+const formatCrShort = (value: number) => formatINRValue(value);
 
 const getHeatmapColor = (value: number, min: number, max: number): string => {
   if (max === min || value === 0) {
@@ -99,9 +90,7 @@ function OutstandingHeatmap({ data }: { data: OutstandingEntry[] }) {
   return (
     <Card className='shadow-sm transition-shadow hover:shadow-md h-full'>
       <CardHeader className='pb-2'>
-        <CardTitle className='text-sm font-semibold tracking-tight'>
-          Outstanding by Dept
-        </CardTitle>
+        <CardTitle className='text-sm font-semibold tracking-tight'>Outstanding by Dept</CardTitle>
       </CardHeader>
       <CardContent className='pt-0'>
         <Table>
@@ -114,8 +103,13 @@ function OutstandingHeatmap({ data }: { data: OutstandingEntry[] }) {
           <TableBody>
             {sorted.map((entry) => (
               <TableRow key={entry.department} className='border-0'>
-                <TableCell className='py-1.5 text-xs font-medium max-w-[120px] truncate'>
-                  {entry.department}
+                <TableCell className='py-1.5 text-xs font-medium max-w-[130px]'>
+                  <span className='block truncate'>{entry.department}</span>
+                  {departmentHead(entry.department) && (
+                    <span className='block truncate text-[10px] font-normal text-muted-foreground'>
+                      {departmentHead(entry.department)}
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell className='py-1.5 text-right'>
                   <span
@@ -144,9 +138,7 @@ function WeeklyMomentum({ data }: { data: MomentumEntry[] }) {
   return (
     <Card className='shadow-sm transition-shadow hover:shadow-md h-full'>
       <CardHeader className='pb-2'>
-        <CardTitle className='text-sm font-semibold tracking-tight'>
-          Weekly Momentum
-        </CardTitle>
+        <CardTitle className='text-sm font-semibold tracking-tight'>Weekly Momentum</CardTitle>
         <p className='text-[11px] text-muted-foreground -mt-1'>vs Last Week</p>
       </CardHeader>
       <CardContent className='pt-0'>
@@ -176,8 +168,13 @@ function WeeklyMomentum({ data }: { data: MomentumEntry[] }) {
 
               return (
                 <TableRow key={entry.department} className='border-0'>
-                  <TableCell className='py-1.5 text-xs font-medium max-w-[110px] truncate'>
-                    {entry.department}
+                  <TableCell className='py-1.5 text-xs font-medium max-w-[120px]'>
+                    <span className='block truncate'>{entry.department}</span>
+                    {departmentHead(entry.department) && (
+                      <span className='block truncate text-[10px] font-normal text-muted-foreground'>
+                        {departmentHead(entry.department)}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className='py-1.5 text-center'>
                     <span className={cn('inline-flex items-center justify-center', colorClass)}>
@@ -207,34 +204,27 @@ function CollectionEfficiencyChart({ data }: { data: CollectionEfficiencyWeek[] 
         </CardTitle>
       </CardHeader>
       <CardContent className='pt-0'>
-        <div className='h-[210px] w-full'>
+        <div className={`h-[210px] w-full ${chartThemeClass}`}>
           <ResponsiveContainer width='100%' height='100%'>
-            <LineChart
-              data={data}
-              margin={{ top: 10, right: 16, left: 0, bottom: 5 }}
-            >
-              <CartesianGrid
-                strokeDasharray='3 3'
-                vertical={false}
-                stroke='hsl(var(--border))'
-              />
+            <LineChart data={data} margin={{ top: 10, right: 16, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray='3 3' vertical={false} />
               <XAxis
                 dataKey='week'
                 tickFormatter={(v) => `W${v}`}
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                tick={{ fontSize: 10 }}
               />
               <YAxis
                 domain={[
                   (min: number) => Math.max(0, Math.floor(min - 5)),
                   (max: number) => Math.ceil(max + 5)
                 ]}
-                tickFormatter={(v) => `${v}%`}
+                tickFormatter={(v) => formatPercent(v)}
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                width={42}
+                tick={{ fontSize: 10 }}
+                width={44}
               />
               <Tooltip
                 content={({ active, payload }) => {
@@ -242,19 +232,17 @@ function CollectionEfficiencyChart({ data }: { data: CollectionEfficiencyWeek[] 
                   const d = payload[0].payload;
                   return (
                     <div className='rounded-lg border bg-popover px-3 py-2 text-xs shadow-xl'>
-                      <p className='font-semibold text-popover-foreground'>
-                        Week {d.week}
-                      </p>
+                      <p className='font-semibold text-popover-foreground'>Week {d.week}</p>
                       <p className='mt-1 text-muted-foreground'>
                         Efficiency:{' '}
                         <span className='font-mono font-semibold text-popover-foreground'>
-                          {d.efficiencyPct.toFixed(1)}%
+                          {formatPercent(d.efficiencyPct)}
                         </span>
                       </p>
                     </div>
                   );
                 }}
-                cursor={{ stroke: 'hsl(var(--border))', strokeDasharray: '4 4' }}
+                cursor={{ stroke: '#94a3b8', strokeDasharray: '4 4' }}
               />
               <Line
                 type='monotone'
@@ -303,7 +291,7 @@ function PerformerCards({
               {topPerformer?.department || '—'}
             </p>
             <p className='mt-1 text-base font-bold text-emerald-600 dark:text-emerald-400'>
-              {topPerformer ? `${topPerformer.achievementPct.toFixed(1)}%` : '—'}
+              {topPerformer ? formatPercent(topPerformer.achievementPct) : '—'}
             </p>
             <p className='text-[10px] text-muted-foreground'>Achievement</p>
           </div>
@@ -320,7 +308,7 @@ function PerformerCards({
               {lowPerformer?.department || '—'}
             </p>
             <p className='mt-1 text-base font-bold text-rose-600 dark:text-rose-400'>
-              {lowPerformer ? `${lowPerformer.achievementPct.toFixed(1)}%` : '—'}
+              {lowPerformer ? formatPercent(lowPerformer.achievementPct) : '—'}
             </p>
             <p className='text-[10px] text-muted-foreground'>Achievement</p>
           </div>

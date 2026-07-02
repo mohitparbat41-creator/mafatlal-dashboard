@@ -1,10 +1,4 @@
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   IconCurrencyRupee,
   IconCash,
@@ -15,6 +9,7 @@ import {
   IconCalendarCheck
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
+import { formatINR, formatTargetCrores } from '@/lib/format';
 
 interface ExecutiveKpiCardsProps {
   totalSales: number;
@@ -28,26 +23,8 @@ interface ExecutiveKpiCardsProps {
   totalWeeks: number;
 }
 
-/**
- * Format a value that is already expressed in Crores.
- * e.g., 320.45 → "₹320.45 Cr" | 0.45 → "₹0.45 Cr"
- */
-const formatCr = (value: number) => {
-  if (value === 0) return '₹0 Cr';
-  if (value >= 1) return `₹${value.toFixed(2)} Cr`;
-  // Sub-crore: show as Lakhs
-  return `₹${(value * 100).toFixed(2)} L`;
-};
-
-/**
- * Compact Cr formatting for the card headline value.
- */
-const formatCrCompact = (value: number) => {
-  if (value === 0) return '₹0';
-  if (value >= 100) return `₹${Math.round(value)} Cr`;
-  if (value >= 1) return `₹${value.toFixed(1)} Cr`;
-  return `₹${(value * 100).toFixed(1)} L`;
-};
+// Headline currency — full rupees → ₹ / L / Cr.
+const formatCrCompact = formatINR;
 
 interface KpiCardConfig {
   title: string;
@@ -107,9 +84,7 @@ export function ExecutiveKpiCards({
 }: ExecutiveKpiCardsProps) {
   // Outstanding as % of sales — capped to 1 decimal
   const outstandingPct =
-    totalSales > 0
-      ? parseFloat(((totalOutstanding / totalSales) * 100).toFixed(1))
-      : 0;
+    totalSales > 0 ? parseFloat(((totalOutstanding / totalSales) * 100).toFixed(1)) : 0;
 
   // Weeks progress — capped to actual quarter weeks
   const safeWeekCount = Math.min(weekCount, totalWeeks);
@@ -119,7 +94,7 @@ export function ExecutiveKpiCards({
     {
       title: 'Total Sales',
       value: formatCrCompact(totalSales),
-      subtitle: `vs Target ${formatCrCompact(totalTarget)}`,
+      subtitle: `vs Target ${formatTargetCrores(totalTarget)}`,
       icon: IconCurrencyRupee,
       trendValue: overallSalesAchPct,
       trendLabel: '',
@@ -186,9 +161,7 @@ export function ExecutiveKpiCards({
         const Icon = card.icon;
 
         // For "invertTrend" cards (outstanding), high % = bad
-        const isPositive = card.invertTrend
-          ? card.trendValue <= 15
-          : card.trendValue >= 0;
+        const isPositive = card.invertTrend ? card.trendValue <= 15 : card.trendValue >= 0;
 
         const trendColorClass = isPositive
           ? 'text-emerald-600 dark:text-emerald-400'
@@ -213,19 +186,27 @@ export function ExecutiveKpiCards({
               </div>
             </CardHeader>
             <CardContent className='px-4 pb-4 pt-1 space-y-1.5'>
-              <div className='text-xl font-bold tracking-tight leading-none'>
-                {card.value}
-              </div>
+              <div className='text-xl font-bold tracking-tight leading-none'>{card.value}</div>
               <p className='text-[11px] text-muted-foreground leading-tight truncate'>
                 {card.subtitle}
               </p>
               <div className='flex items-center gap-1'>
                 {card.trendLabel ? (
-                  <span className={cn('text-[11px] font-semibold', 'text-indigo-600 dark:text-indigo-400')}>
+                  <span
+                    className={cn(
+                      'text-[11px] font-semibold',
+                      'text-indigo-600 dark:text-indigo-400'
+                    )}
+                  >
                     {card.trendLabel}
                   </span>
                 ) : (
-                  <span className={cn('inline-flex items-center gap-0.5 text-[11px] font-semibold', trendColorClass)}>
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-0.5 text-[11px] font-semibold',
+                      trendColorClass
+                    )}
+                  >
                     {isPositive ? (
                       <IconTrendingUp className='h-3 w-3' />
                     ) : (
@@ -238,7 +219,10 @@ export function ExecutiveKpiCards({
               {/* Mini progress bar with inline color */}
               <div className='h-1.5 w-full rounded-full bg-primary/10'>
                 <div
-                  className={cn('h-full rounded-full transition-all duration-500', colors.progressBar)}
+                  className={cn(
+                    'h-full rounded-full transition-all duration-500',
+                    colors.progressBar
+                  )}
                   style={{ width: `${Math.min(card.progressValue, 100)}%` }}
                 />
               </div>
