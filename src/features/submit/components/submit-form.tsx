@@ -304,7 +304,7 @@ export function SubmitForm({
           name='sales_achieved'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Sales Achieved</FormLabel>
+              <FormLabel>Sales (Selected Week)</FormLabel>
               <FormControl>
                 <Input
                   type='number'
@@ -325,7 +325,7 @@ export function SubmitForm({
           name='collection_amount'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Collection Amount</FormLabel>
+              <FormLabel>Collection (Selected Week)</FormLabel>
               <FormControl>
                 <Input
                   type='number'
@@ -346,7 +346,7 @@ export function SubmitForm({
           name='outstanding_amount'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Current Outstanding</FormLabel>
+              <FormLabel>Overall Outstanding Till This Week</FormLabel>
               <FormControl>
                 <Input
                   type='number'
@@ -370,7 +370,7 @@ export function SubmitForm({
           name='remarks'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Remarks (Optional)</FormLabel>
+              <FormLabel>Remarks</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder='Add any additional details or context here...'

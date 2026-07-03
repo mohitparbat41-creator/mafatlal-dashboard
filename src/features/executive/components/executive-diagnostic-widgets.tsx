@@ -32,8 +32,9 @@ import { departmentHead } from '@/features/submit/api/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
-export interface OutstandingEntry {
-  department: string;
+export interface OutstandingWeekEntry {
+  week_number: number;
+  date_range: string;
   outstanding: number;
 }
 
@@ -54,7 +55,7 @@ export interface PerformerInfo {
 }
 
 interface ExecutiveDiagnosticWidgetsProps {
-  outstandingData: OutstandingEntry[];
+  outstandingByWeek: OutstandingWeekEntry[];
   momentumData: MomentumEntry[];
   collectionEfficiencyData: CollectionEfficiencyWeek[];
   topPerformer: PerformerInfo | null;
@@ -66,65 +67,69 @@ interface ExecutiveDiagnosticWidgetsProps {
 // Full-rupee outstanding → compact ₹/L/Cr value.
 const formatCrShort = (value: number) => formatINRValue(value);
 
-const getHeatmapColor = (value: number, min: number, max: number): string => {
-  if (max === min || value === 0) {
-    return 'bg-green-50 text-green-800 dark:bg-green-950/20 dark:text-green-300';
-  }
-  const ratio = (value - min) / (max - min);
-  if (ratio < 0.33) return 'bg-green-50 text-green-800 dark:bg-green-950/20 dark:text-green-300';
-  if (ratio < 0.66) return 'bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-300';
-  return 'bg-rose-50 text-rose-800 dark:bg-rose-950/20 dark:text-rose-300';
-};
+// ─── Overall Outstanding by Week ─────────────────────────────────────────
 
-// ─── Outstanding Heatmap ─────────────────────────────────────────────────
-
-function OutstandingHeatmap({ data }: { data: OutstandingEntry[] }) {
+function OutstandingByWeekChart({ data }: { data: OutstandingWeekEntry[] }) {
   if (!data.length) return null;
-
-  const values = data.map((d) => d.outstanding);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-
-  const sorted = [...data].sort((a, b) => b.outstanding - a.outstanding);
 
   return (
     <Card className='shadow-sm transition-shadow hover:shadow-md h-full'>
       <CardHeader className='pb-2'>
-        <CardTitle className='text-sm font-semibold tracking-tight'>Outstanding by Dept</CardTitle>
+        <CardTitle className='text-sm font-semibold tracking-tight'>
+          Overall Outstanding by Week
+        </CardTitle>
       </CardHeader>
       <CardContent className='pt-0'>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className='text-xs py-2'>Department</TableHead>
-              <TableHead className='text-right text-xs py-2'>Amount</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sorted.map((entry) => (
-              <TableRow key={entry.department} className='border-0'>
-                <TableCell className='py-1.5 text-xs font-medium max-w-[130px]'>
-                  <span className='block truncate'>{entry.department}</span>
-                  {departmentHead(entry.department) && (
-                    <span className='block truncate text-[10px] font-normal text-muted-foreground'>
-                      {departmentHead(entry.department)}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className='py-1.5 text-right'>
-                  <span
-                    className={cn(
-                      'inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums whitespace-nowrap',
-                      getHeatmapColor(entry.outstanding, min, max)
-                    )}
-                  >
-                    {formatCrShort(entry.outstanding)}
-                  </span>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className={`h-[210px] w-full ${chartThemeClass}`}>
+          <ResponsiveContainer width='100%' height='100%'>
+            <LineChart data={data} margin={{ top: 10, right: 16, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray='3 3' vertical={false} />
+              <XAxis
+                dataKey='week_number'
+                tickFormatter={(v) => `W${v}`}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10 }}
+              />
+              <YAxis
+                tickFormatter={(v) => formatCrShort(v)}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10 }}
+                width={54}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0].payload;
+                  return (
+                    <div className='rounded-lg border bg-popover px-3 py-2 text-xs shadow-xl'>
+                      <p className='font-semibold text-popover-foreground'>
+                        {d.date_range || `Week ${d.week_number}`}
+                      </p>
+                      <p className='mt-1 text-muted-foreground'>
+                        Outstanding:{' '}
+                        <span className='font-mono font-semibold text-popover-foreground'>
+                          {formatCrShort(d.outstanding)}
+                        </span>
+                      </p>
+                    </div>
+                  );
+                }}
+                cursor={{ stroke: '#94a3b8', strokeDasharray: '4 4' }}
+              />
+              <Line
+                type='monotone'
+                dataKey='outstanding'
+                stroke='#f43f5e'
+                strokeWidth={2.5}
+                dot={{ r: 3.5, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }}
+                activeDot={{ r: 5.5, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }}
+                animationDuration={700}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   );
@@ -321,7 +326,7 @@ function PerformerCards({
 // ─── Combined Export ──────────────────────────────────────────────────────
 
 export function ExecutiveDiagnosticWidgets({
-  outstandingData,
+  outstandingByWeek,
   momentumData,
   collectionEfficiencyData,
   topPerformer,
@@ -330,7 +335,7 @@ export function ExecutiveDiagnosticWidgets({
   return (
     <div className='grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-12'>
       <div className='lg:col-span-3'>
-        <OutstandingHeatmap data={outstandingData} />
+        <OutstandingByWeekChart data={outstandingByWeek} />
       </div>
       <div className='lg:col-span-2'>
         <WeeklyMomentum data={momentumData} />

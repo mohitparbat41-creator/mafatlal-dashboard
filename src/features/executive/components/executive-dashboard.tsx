@@ -12,7 +12,7 @@ import { ExecutiveTargetGauge } from './executive-target-gauge';
 import { ExecutiveDeptRanking, DeptRankingEntry } from './executive-dept-ranking';
 import {
   ExecutiveDiagnosticWidgets,
-  OutstandingEntry,
+  OutstandingWeekEntry,
   MomentumEntry,
   CollectionEfficiencyWeek,
   PerformerInfo
@@ -113,7 +113,7 @@ export function ExecutiveDashboard() {
     totals,
     chartData,
     departmentRanking,
-    outstandingData,
+    outstandingByWeek,
     momentumData,
     collectionEfficiencyData,
     topPerformer,
@@ -127,7 +127,7 @@ export function ExecutiveDashboard() {
         totals: null,
         chartData: [],
         departmentRanking: [],
-        outstandingData: [],
+        outstandingByWeek: [],
         momentumData: [],
         collectionEfficiencyData: [],
         topPerformer: null,
@@ -173,10 +173,19 @@ export function ExecutiveDashboard() {
       }
     });
 
-    // Step 3: Only include weeks that have actual sales data (latest_submission_time is not null)
-    // This prevents future weeks with zero data from polluting charts
+    // Step 3: Restrict to "active" weeks — weeks in which at least one department has
+    // actually reported (non-null latest_submission_time). This still hides future /
+    // never-reported weeks (no chart pollution), but now KEEPS every department that has
+    // a target for an active week even if it hasn't submitted sales yet — so newly
+    // onboarded departments (targets imported, sales pending, e.g. D10/D11) still show
+    // their target. Only row inclusion changes here; no calculation formula is altered.
+    const activeWeeks = new Set(
+      timeFiltered.filter((row) => row.latest_submission_time != null).map((row) => row.week_number)
+    );
     const filteredData = timeFiltered.filter(
-      (row) => row.latest_submission_time !== null && row.latest_submission_time !== undefined
+      (row) =>
+        (row.latest_submission_time !== null && row.latest_submission_time !== undefined) ||
+        (Number(row.weekly_target_amount) > 0 && activeWeeks.has(row.week_number))
     );
 
     // Step 4: Process each row with cumulative totals
@@ -322,14 +331,26 @@ export function ExecutiveDashboard() {
       });
     });
 
-    // Outstanding heatmap — each department's LATEST outstanding balance.
-    const outstandingData: OutstandingEntry[] = [];
-    latestOutstanding.forEach((v, dept) => {
-      outstandingData.push({
-        department: dept,
-        outstanding: v.value
-      });
+    // Overall Outstanding by Week — sum of each department's independently entered
+    // outstanding_amount for that week (never Sales − Collection). Shows how the total
+    // outstanding balance moves across the active weeks.
+    const outstandingWeekMap = new Map<
+      number,
+      { week_number: number; date_range: string; outstanding: number }
+    >();
+    processedData.forEach((row) => {
+      if (!outstandingWeekMap.has(row.week_number)) {
+        outstandingWeekMap.set(row.week_number, {
+          week_number: row.week_number,
+          date_range: row.date_range || `W${row.week_number}`,
+          outstanding: 0
+        });
+      }
+      outstandingWeekMap.get(row.week_number)!.outstanding += row.outstanding_amount;
     });
+    const outstandingByWeek: OutstandingWeekEntry[] = Array.from(outstandingWeekMap.values()).sort(
+      (a, b) => a.week_number - b.week_number
+    );
 
     // Momentum: compare latest two weeks per department
     const allWeeks = Array.from(new Set(processedData.map((r) => r.week_number))).sort(
@@ -392,7 +413,7 @@ export function ExecutiveDashboard() {
       totals: totalsObj,
       chartData,
       departmentRanking,
-      outstandingData,
+      outstandingByWeek,
       momentumData,
       collectionEfficiencyData,
       topPerformer,
@@ -672,7 +693,7 @@ export function ExecutiveDashboard() {
 
           {/* SECTION 3: Diagnostic Widgets */}
           <ExecutiveDiagnosticWidgets
-            outstandingData={outstandingData}
+            outstandingByWeek={outstandingByWeek}
             momentumData={momentumData}
             collectionEfficiencyData={collectionEfficiencyData}
             topPerformer={topPerformer}
