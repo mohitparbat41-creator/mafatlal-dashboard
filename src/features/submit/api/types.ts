@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 // Canonical department list — the single source of truth for the whole app.
-// (IDs D04 and D05 were merged/removed in the DB.) Order: D01, D02, D03, D06–D09.
+// (IDs D04 and D05 were merged/removed in the DB.)
+// Order: D01, D02, D03, D06, D07, D08, D09, D10, D11.
 export const DEPARTMENTS = [
   { id: 'D01', name: 'Tender & Corporate Services', head: 'Akash' },
   { id: 'D02', name: 'Digital Infrastructure', head: 'Jitendra Pradhan' },
@@ -9,7 +10,9 @@ export const DEPARTMENTS = [
   { id: 'D06', name: 'Home Furnishing', head: 'Prashant' },
   { id: 'D07', name: 'Traditional Textile', head: 'Raju' },
   { id: 'D08', name: 'Online Business', head: 'Sumit' },
-  { id: 'D09', name: 'Uniform Solutions', head: 'Varun' }
+  { id: 'D09', name: 'Uniform Solutions', head: 'Varun' },
+  { id: 'D10', name: 'OGP & Syndicate', head: 'Brijesh' },
+  { id: 'D11', name: 'Exports & RMG', head: 'Akilesh' }
 ] as const;
 
 /** Department head for the muted eyebrow label — look up by department name OR id. */
