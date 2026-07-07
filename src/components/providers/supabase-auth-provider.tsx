@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
@@ -33,57 +33,63 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const [isLoading, setIsLoading] = useState(true);
 
   const supabase = createClient();
+  // The last user id we fetched a profile for — dedupes the redundant profile
+  // reads (initial load fired both getUser() and the INITIAL_SESSION event, and
+  // every token refresh re-fetched). We now hit user_profiles once per user.
+  const profileForUserId = useRef<string | null>(null);
 
   useEffect(() => {
-    // Get initial session
-    const getSession = async () => {
+    let active = true;
+
+    const applyProfile = async (currentUser: User | null) => {
+      if (!currentUser) {
+        profileForUserId.current = null;
+        if (active) {
+          setRole(null);
+          setDepartment(null);
+        }
+        return;
+      }
+      if (profileForUserId.current === currentUser.id) return; // already loaded
+      profileForUserId.current = currentUser.id;
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role, department_id')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (!active) return;
+      setRole(((profile?.role as string)?.toLowerCase() as UserRole) || 'sales');
+      setDepartment((profile?.department_id as string) ?? null);
+    };
+
+    // Initial session.
+    const init = async () => {
       const {
         data: { user: currentUser }
       } = await supabase.auth.getUser();
-
+      if (!active) return;
       setUser(currentUser);
-
-      if (currentUser) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('role, department_id')
-          .eq('id', currentUser.id)
-          .single();
-
-        setRole(((profile?.role as string)?.toLowerCase() as UserRole) || 'sales');
-        setDepartment((profile?.department_id as string) ?? null);
-      }
-
-      setIsLoading(false);
+      await applyProfile(currentUser);
+      if (active) setIsLoading(false);
     };
+    void init();
 
-    void getSession();
-
-    // Listen for auth state changes
+    // Subsequent auth changes (sign-in/out, token refresh). The dedupe above
+    // means a token refresh for the same user does NOT refetch the profile.
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
+      if (!active) return;
       setUser(currentUser);
-
-      if (currentUser) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('role, department_id')
-          .eq('id', currentUser.id)
-          .single();
-
-        setRole(((profile?.role as string)?.toLowerCase() as UserRole) || 'sales');
-        setDepartment((profile?.department_id as string) ?? null);
-      } else {
-        setRole(null);
-        setDepartment(null);
-      }
-
-      setIsLoading(false);
+      await applyProfile(currentUser);
+      if (active) setIsLoading(false);
     });
 
     return () => {
+      active = false;
       subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase client is stable

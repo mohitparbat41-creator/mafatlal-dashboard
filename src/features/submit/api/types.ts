@@ -19,12 +19,24 @@ export const DEPARTMENTS = [
 export const departmentHead = (nameOrId: string): string | undefined =>
   DEPARTMENTS.find((d) => d.name === nameOrId || d.id === nameOrId)?.head;
 
+// A rupee amount entered as a string: required, parseable, and non-negative.
+// This rejects lone '-' / '.' / '' that would otherwise slip past a length check
+// and get silently coerced to 0 in the service layer.
+const rupeeAmount = (label: string) =>
+  z
+    .string()
+    .min(1, `${label} is required.`)
+    .refine((v) => {
+      const n = parseFloat(v);
+      return Number.isFinite(n) && n >= 0;
+    }, `Enter a valid ${label.toLowerCase()} (0 or more).`);
+
 export const salesSubmissionSchema = z.object({
   department_id: z.string().min(1, 'Please select a department.'),
   weekly_target_id: z.string().min(1, 'Please select a week.'),
-  sales_achieved: z.string().min(1, 'Sales achieved is required.'),
-  collection_amount: z.string().min(1, 'Collection amount is required.'),
-  outstanding_amount: z.string().min(1, 'Current outstanding is required.'),
+  sales_achieved: rupeeAmount('Sales'),
+  collection_amount: rupeeAmount('Collection'),
+  outstanding_amount: rupeeAmount('Outstanding'),
   remarks: z.string().optional()
 });
 

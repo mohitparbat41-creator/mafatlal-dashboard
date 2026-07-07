@@ -81,14 +81,29 @@ const weekFromTargetId = (id: string): number => {
   return m ? parseInt(m[1], 10) : 0;
 };
 
-export async function fetchSubmissions(): Promise<SubmissionRecord[]> {
+/**
+ * Submission history rows. When `departmentId` is given (sales role) the query is
+ * scoped server-side to that department — a much smaller payload than the whole
+ * table and a defence-in-depth guard that does not depend on RLS being live.
+ * `.limit` caps the result so a single navigation never streams the full table.
+ */
+export async function fetchSubmissions(
+  opts: { departmentId?: string } = {}
+): Promise<SubmissionRecord[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from('sales_submissions')
     .select(
       'record_id, weekly_target_id, department_id, user_email, sales_achieved, collection_amount, outstanding_amount, remarks, timestamp'
     )
-    .order('timestamp', { ascending: false });
+    .order('timestamp', { ascending: false })
+    .limit(1000);
+
+  if (opts.departmentId) {
+    query = query.eq('department_id', opts.departmentId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching submissions:', error);
@@ -111,6 +126,33 @@ export async function fetchSubmissions(): Promise<SubmissionRecord[]> {
   }));
 }
 
+/**
+ * Week numbers a department has already submitted (for the green week chips).
+ * Selects a single column scoped to the department — intentionally cheap, so the
+ * Sales Entry form never pulls the full history payload just to colour a dropdown.
+ */
+export async function fetchSubmittedWeeks(departmentId: string): Promise<number[]> {
+  if (!departmentId) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('sales_submissions')
+    .select('weekly_target_id')
+    .eq('department_id', departmentId)
+    .limit(1000);
+
+  if (error) {
+    console.error('Error fetching submitted weeks:', error);
+    throw new Error(error.message);
+  }
+
+  const weeks = new Set<number>();
+  (data || []).forEach((r: any) => {
+    const w = weekFromTargetId(r.weekly_target_id);
+    if (w) weeks.add(w);
+  });
+  return Array.from(weeks);
+}
+
 export async function updateSubmission(
   recordId: string,
   values: Pick<
@@ -120,7 +162,9 @@ export async function updateSubmission(
 ): Promise<void> {
   const supabase = createClient();
   // Only the editable fields are sent — department, week and user stay fixed.
-  // (RLS additionally blocks cross-department edits.)
+  // Server-side RLS additionally blocks editing another department's rows AND any
+  // row older than the 3-business-week window (see supabase_migration_restore_rls.sql),
+  // so a crafted API call cannot bypass the disabled UI buttons.
   const { error } = await supabase
     .from('sales_submissions')
     .update({

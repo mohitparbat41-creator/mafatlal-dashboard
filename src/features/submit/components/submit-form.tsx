@@ -3,13 +3,15 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { submitSalesData, updateSubmission } from '../api/service';
+import { submittedWeeksQueryOptions, submitKeys } from '../api/queries';
+import { FISCAL_WEEKS, getCurrentWeekNumber } from '../api/weeks';
 import { useAuth } from '@/components/providers/supabase-auth-provider';
+import { cn } from '@/lib/utils';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Form,
@@ -27,72 +29,48 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Icons } from '@/components/icons';
+import { IndianNumberInput } from './indian-number-input';
 
 import {
   salesSubmissionSchema,
   SalesSubmissionFormValues,
   DEPARTMENTS,
-  SubmissionRecord,
-  departmentHead
+  SubmissionRecord
 } from '../api/types';
-const HARDCODED_WEEKS = [
-  'Week 1: 01-Apr to 05-Apr',
-  'Week 2: 06-Apr to 12-Apr',
-  'Week 3: 13-Apr to 19-Apr',
-  'Week 4: 20-Apr to 26-Apr',
-  'Week 5: 27-Apr to 03-May',
-  'Week 6: 04-May to 10-May',
-  'Week 7: 11-May to 17-May',
-  'Week 8: 18-May to 24-May',
-  'Week 9: 25-May to 31-May',
-  'Week 10: 01-Jun to 07-Jun',
-  'Week 11: 08-Jun to 14-Jun',
-  'Week 12: 15-Jun to 21-Jun',
-  'Week 13: 22-Jun to 28-Jun',
-  'Week 14: 29-Jun to 05-Jul',
-  'Week 15: 06-Jul to 12-Jul',
-  'Week 16: 13-Jul to 19-Jul',
-  'Week 17: 20-Jul to 26-Jul',
-  'Week 18: 27-Jul to 02-Aug',
-  'Week 19: 03-Aug to 09-Aug',
-  'Week 20: 10-Aug to 16-Aug',
-  'Week 21: 17-Aug to 23-Aug',
-  'Week 22: 24-Aug to 30-Aug',
-  'Week 23: 31-Aug to 06-Sep',
-  'Week 24: 07-Sep to 13-Sep',
-  'Week 25: 14-Sep to 20-Sep',
-  'Week 26: 21-Sep to 27-Sep',
-  'Week 27: 28-Sep to 04-Oct',
-  'Week 28: 05-Oct to 11-Oct',
-  'Week 29: 12-Oct to 18-Oct',
-  'Week 30: 19-Oct to 25-Oct',
-  'Week 31: 26-Oct to 01-Nov',
-  'Week 32: 02-Nov to 08-Nov',
-  'Week 33: 09-Nov to 15-Nov',
-  'Week 34: 16-Nov to 22-Nov',
-  'Week 35: 23-Nov to 29-Nov',
-  'Week 36: 30-Nov to 06-Dec',
-  'Week 37: 07-Dec to 13-Dec',
-  'Week 38: 14-Dec to 20-Dec',
-  'Week 39: 21-Dec to 27-Dec',
-  'Week 40: 28-Dec to 03-Jan',
-  'Week 41: 04-Jan to 10-Jan',
-  'Week 42: 11-Jan to 17-Jan',
-  'Week 43: 18-Jan to 24-Jan',
-  'Week 44: 25-Jan to 31-Jan',
-  'Week 45: 01-Feb to 07-Feb',
-  'Week 46: 08-Feb to 14-Feb',
-  'Week 47: 15-Feb to 21-Feb',
-  'Week 48: 22-Feb to 28-Feb',
-  'Week 49: 01-Mar to 07-Mar',
-  'Week 50: 08-Mar to 14-Mar',
-  'Week 51: 15-Mar to 21-Mar',
-  'Week 52: 22-Mar to 28-Mar',
-  'Week 53: 29-Mar to 31-Mar'
-];
 
 const deptName = (id: string) => DEPARTMENTS.find((d) => d.id === id)?.name ?? id;
+
+/** Status chip for a week option: red = due (past/current, not submitted), green = submitted, grey = future. */
+function WeekOption({
+  label,
+  weekNumber,
+  currentWeek,
+  submitted
+}: {
+  label: string;
+  weekNumber: number;
+  currentWeek: number;
+  submitted: boolean;
+}) {
+  const pastOrCurrent = weekNumber <= currentWeek;
+  return (
+    <span
+      className={cn(
+        'flex w-full items-center justify-between gap-2 rounded-sm px-2 py-0.5',
+        submitted
+          ? 'bg-green-100 text-green-900 dark:bg-green-950/60 dark:text-green-200'
+          : pastOrCurrent
+            ? 'bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-200'
+            : 'bg-muted text-muted-foreground'
+      )}
+    >
+      <span>{label}</span>
+      {submitted && <Icons.check className='h-3.5 w-3.5 shrink-0' />}
+    </span>
+  );
+}
 
 export function SubmitForm({
   editRecord,
@@ -101,7 +79,8 @@ export function SubmitForm({
   editRecord?: SubmissionRecord;
   onSuccess?: () => void;
 } = {}) {
-  const { role, department } = useAuth();
+  const { role, department, isLoading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEdit = !!editRecord;
 
@@ -109,12 +88,34 @@ export function SubmitForm({
   const salesLocked = role === 'sales';
   const lockedDeptId = isEdit ? editRecord!.department_id : (department ?? '');
 
+  const currentWeek = getCurrentWeekNumber();
+
+  // A sales user whose profile has no department cannot submit for anyone — show a
+  // clear blocking state rather than letting the form fail zod validation silently.
+  const missingDept = salesLocked && !isEdit && !authLoading && !lockedDeptId;
+  // Block submit until the department is actually known (covers the brief auth-
+  // loading window too). Without this, clicking during load would fail the hidden
+  // department_id validation and the page would just scroll to the (message-less)
+  // department field. Never let that happen.
+  const submitDisabled = isSubmitting || (salesLocked && !isEdit && (authLoading || !lockedDeptId));
+
+  // Week submission status for the logged-in department (sales only). Cheap query:
+  // one column, scoped to the department — not the full history payload.
+  const { data: submittedWeekList } = useQuery({
+    ...submittedWeeksQueryOptions(lockedDeptId),
+    enabled: salesLocked && !isEdit && !!lockedDeptId
+  });
+  const submittedWeeks = useMemo(
+    () => new Set<number>(submittedWeekList ?? []),
+    [submittedWeekList]
+  );
+
   const form = useForm<SalesSubmissionFormValues>({
     resolver: zodResolver(salesSubmissionSchema),
     defaultValues: editRecord
       ? {
           department_id: editRecord.department_id,
-          weekly_target_id: HARDCODED_WEEKS[editRecord.week_number - 1] ?? '',
+          weekly_target_id: FISCAL_WEEKS[editRecord.week_number - 1] ?? '',
           sales_achieved: String(editRecord.sales_achieved ?? ''),
           collection_amount: String(editRecord.collection_amount ?? ''),
           outstanding_amount: String(editRecord.outstanding_amount ?? ''),
@@ -175,6 +176,8 @@ export function SubmitForm({
       toast.success('Submission successful!', {
         description: 'Your sales data has been recorded successfully.'
       });
+      // Refresh the green "submitted" week chips and any open history list.
+      queryClient.invalidateQueries({ queryKey: submitKeys.all });
       form.reset({
         department_id: salesLocked ? (department ?? '') : '',
         weekly_target_id: '',
@@ -195,23 +198,34 @@ export function SubmitForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
-        {/* Department — locked badge for Sales; dropdown only for Management */}
+        {/* Department — auto-filled, disabled dropdown for Sales; selectable for Management */}
         {salesLocked ? (
           <FormItem>
             <FormLabel>Department</FormLabel>
-            <div className='space-y-0.5'>
-              <Badge variant='secondary' className='px-3 py-1 text-sm font-medium'>
-                {lockedDeptId ? deptName(lockedDeptId) : 'Not assigned'}
-              </Badge>
-              {lockedDeptId && departmentHead(lockedDeptId) && (
-                <span className='block text-[11px] text-muted-foreground'>
-                  {departmentHead(lockedDeptId)}
-                </span>
-              )}
-            </div>
-            <FormDescription>
-              Your department is set from your profile and can&apos;t be changed.
-            </FormDescription>
+            <Select value={lockedDeptId || undefined} disabled>
+              <FormControl>
+                <SelectTrigger className='w-full'>
+                  <SelectValue placeholder={authLoading ? 'Loading…' : 'No department assigned'}>
+                    {lockedDeptId ? deptName(lockedDeptId) : null}
+                  </SelectValue>
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {lockedDeptId && (
+                  <SelectItem value={lockedDeptId}>{deptName(lockedDeptId)}</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {missingDept ? (
+              <p className='text-destructive text-sm font-medium'>
+                No department is linked to your profile, so you can&apos;t submit. Please contact an
+                administrator to set your department.
+              </p>
+            ) : (
+              <FormDescription>
+                Your department is set from your profile and can&apos;t be changed.
+              </FormDescription>
+            )}
           </FormItem>
         ) : (
           <FormField
@@ -256,9 +270,7 @@ export function SubmitForm({
           <FormItem>
             <FormLabel>Week / Date Range</FormLabel>
             <Input
-              value={
-                HARDCODED_WEEKS[editRecord!.week_number - 1] ?? `Week ${editRecord!.week_number}`
-              }
+              value={FISCAL_WEEKS[editRecord!.week_number - 1] ?? `Week ${editRecord!.week_number}`}
               disabled
               readOnly
             />
@@ -282,15 +294,23 @@ export function SubmitForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {HARDCODED_WEEKS.map((weekStr) => (
-                      <SelectItem key={weekStr} value={weekStr}>
-                        {weekStr}
+                    {FISCAL_WEEKS.map((weekStr, i) => (
+                      <SelectItem key={weekStr} value={weekStr} className='p-1'>
+                        <WeekOption
+                          label={weekStr}
+                          weekNumber={i + 1}
+                          currentWeek={currentWeek}
+                          submitted={salesLocked && submittedWeeks.has(i + 1)}
+                        />
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <FormDescription>
-                  Select the specific week you are submitting data for.
+                  Select the specific week you are submitting data for.{' '}
+                  <span className='text-green-700 dark:text-green-400'>Green</span> = already
+                  submitted, <span className='text-red-700 dark:text-red-400'>red</span> = due, grey
+                  = upcoming.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -306,14 +326,15 @@ export function SubmitForm({
             <FormItem>
               <FormLabel>Sales (Selected Week)</FormLabel>
               <FormControl>
-                <Input
-                  type='number'
-                  placeholder='0.00'
-                  step='0.01'
-                  {...field}
+                <IndianNumberInput
+                  placeholder='0'
                   value={field.value ?? ''}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  name={field.name}
                 />
               </FormControl>
+              <FormDescription>In full rupees — e.g. 20,00,000.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -327,12 +348,12 @@ export function SubmitForm({
             <FormItem>
               <FormLabel>Collection (Selected Week)</FormLabel>
               <FormControl>
-                <Input
-                  type='number'
-                  placeholder='0.00'
-                  step='0.01'
-                  {...field}
+                <IndianNumberInput
+                  placeholder='0'
                   value={field.value ?? ''}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  name={field.name}
                 />
               </FormControl>
               <FormMessage />
@@ -348,12 +369,12 @@ export function SubmitForm({
             <FormItem>
               <FormLabel>Overall Outstanding Till This Week</FormLabel>
               <FormControl>
-                <Input
-                  type='number'
+                <IndianNumberInput
                   placeholder='0'
-                  step='0.01'
-                  {...field}
                   value={field.value ?? ''}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  name={field.name}
                 />
               </FormControl>
               <FormDescription>
@@ -385,7 +406,7 @@ export function SubmitForm({
         />
 
         {/* Submit Button */}
-        <Button type='submit' className='w-full' disabled={isSubmitting}>
+        <Button type='submit' className='w-full' disabled={submitDisabled}>
           {isSubmitting && <Icons.spinner className='mr-2 h-4 w-4 animate-spin' />}
           {isSubmitting
             ? isEdit

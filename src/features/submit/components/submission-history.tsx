@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { submissionsQueryOptions, submitKeys } from '../api/queries';
 import { deleteSubmission } from '../api/service';
 import { SubmissionRecord, DEPARTMENTS, departmentHead } from '../api/types';
+import { getCurrentWeekNumber, isWithinSalesWindow, SALES_WEEK_WINDOW } from '../api/weeks';
 import { SubmitForm } from './submit-form';
 import { useAuth } from '@/components/providers/supabase-auth-provider';
 import { formatINR } from '@/lib/format';
@@ -55,19 +56,23 @@ function fmtDateTime(iso: string): string {
 }
 
 export function SubmissionHistory() {
-  const { role } = useAuth();
+  const { role, department } = useAuth();
   // Sales can edit/delete their own department; management is read-only.
   const canEdit = role === 'sales';
+  const isManagement = role === 'management';
   const queryClient = useQueryClient();
+  const currentWeek = getCurrentWeekNumber();
 
-  const { data, isLoading, error } = useQuery(submissionsQueryOptions());
+  // Sales scope the fetch to their own department server-side; management reads all.
+  const { data, isLoading, error } = useQuery(
+    submissionsQueryOptions(isManagement ? undefined : (department ?? undefined))
+  );
 
   const [search, setSearch] = useState('');
   const [weekFilter, setWeekFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
-  // Department filter is management-only (sales are already scoped to one dept by RLS).
+  // Department filter is management-only (sales are already scoped to one dept).
   const [deptFilter, setDeptFilter] = useState('all');
-  const isManagement = role === 'management';
 
   const [editRecord, setEditRecord] = useState<SubmissionRecord | null>(null);
   const [deleteRecord, setDeleteRecord] = useState<SubmissionRecord | null>(null);
@@ -75,23 +80,38 @@ export function SubmissionHistory() {
   const removeMutation = useMutation({
     mutationFn: (id: string) => deleteSubmission(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: submitKeys.submissions() });
+      // Invalidate everything under 'submit' so the week status chips (submitted
+      // weeks) on the entry form also refresh, not just the history list.
+      queryClient.invalidateQueries({ queryKey: submitKeys.all });
       toast.success('Submission deleted');
       setDeleteRecord(null);
     },
     onError: (e: any) => toast.error('Delete failed', { description: e?.message })
   });
 
+  // Sales see ONLY their own department AND only the trailing 3 business weeks
+  // (current + 2 prior). Management sees the full history. This client filter is
+  // defence-in-depth on top of RLS; it FAILS CLOSED — a sales user with no
+  // department sees nothing rather than every department's rows.
+  const visibleRows = useMemo(() => {
+    const rows = data || [];
+    if (isManagement) return rows;
+    if (!department) return [];
+    return rows.filter(
+      (r) => r.department_id === department && isWithinSalesWindow(r.week_number, currentWeek)
+    );
+  }, [data, isManagement, department, currentWeek]);
+
   const weeks = useMemo(() => {
     const set = new Set<number>();
-    (data || []).forEach((r) => {
+    visibleRows.forEach((r) => {
       if (r.week_number) set.add(r.week_number);
     });
     return Array.from(set).sort((a, b) => a - b);
-  }, [data]);
+  }, [visibleRows]);
 
   const filtered = useMemo(() => {
-    let rows = data || [];
+    let rows = visibleRows;
     const q = search.trim().toLowerCase();
     if (q) {
       rows = rows.filter(
@@ -112,7 +132,7 @@ export function SubmissionHistory() {
       rows = rows.filter((r) => r.department_id === deptFilter);
     }
     return rows;
-  }, [data, search, weekFilter, dateFilter, deptFilter, isManagement]);
+  }, [visibleRows, search, weekFilter, dateFilter, deptFilter, isManagement]);
 
   const hasFilters =
     !!search || weekFilter !== 'all' || !!dateFilter || (isManagement && deptFilter !== 'all');
@@ -128,7 +148,7 @@ export function SubmissionHistory() {
           <CardDescription className='text-xs'>
             {role === 'management'
               ? 'All departments — read-only'
-              : 'Your department — edit or delete your submissions'}
+              : `Your department — last ${SALES_WEEK_WINDOW} business weeks. Edit or delete within this window.`}
           </CardDescription>
         </div>
 
@@ -295,26 +315,38 @@ export function SubmissionHistory() {
                     </TableCell>
                     {canEdit && (
                       <TableCell className='py-2 text-right whitespace-nowrap'>
-                        <div className='flex justify-end gap-1'>
-                          <Button
-                            variant='ghost'
-                            size='icon'
-                            className='h-7 w-7'
-                            aria-label='Edit submission'
-                            onClick={() => setEditRecord(r)}
-                          >
-                            <Icons.edit className='h-3.5 w-3.5' />
-                          </Button>
-                          <Button
-                            variant='ghost'
-                            size='icon'
-                            className='hover:text-destructive h-7 w-7'
-                            aria-label='Delete submission'
-                            onClick={() => setDeleteRecord(r)}
-                          >
-                            <Icons.trash className='h-3.5 w-3.5' />
-                          </Button>
-                        </div>
+                        {(() => {
+                          // Submissions older than the window become read-only.
+                          const locked = !isWithinSalesWindow(r.week_number, currentWeek);
+                          const lockedTitle = `Locked — older than ${SALES_WEEK_WINDOW} business weeks`;
+                          return (
+                            <div
+                              className='flex justify-end gap-1'
+                              title={locked ? lockedTitle : undefined}
+                            >
+                              <Button
+                                variant='ghost'
+                                size='icon'
+                                className='h-7 w-7'
+                                aria-label='Edit submission'
+                                disabled={locked}
+                                onClick={() => setEditRecord(r)}
+                              >
+                                <Icons.edit className='h-3.5 w-3.5' />
+                              </Button>
+                              <Button
+                                variant='ghost'
+                                size='icon'
+                                className='hover:text-destructive h-7 w-7'
+                                aria-label='Delete submission'
+                                disabled={locked}
+                                onClick={() => setDeleteRecord(r)}
+                              >
+                                <Icons.trash className='h-3.5 w-3.5' />
+                              </Button>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                     )}
                   </TableRow>
@@ -342,9 +374,7 @@ export function SubmissionHistory() {
               editRecord={editRecord}
               onSuccess={() => {
                 setEditRecord(null);
-                queryClient.invalidateQueries({
-                  queryKey: submitKeys.submissions()
-                });
+                queryClient.invalidateQueries({ queryKey: submitKeys.all });
               }}
             />
           )}
