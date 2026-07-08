@@ -80,7 +80,7 @@ function OutstandingByWeekChart({ data }: { data: OutstandingWeekEntry[] }) {
         </CardTitle>
       </CardHeader>
       <CardContent className='pt-0'>
-        <div className={`h-[210px] w-full ${chartThemeClass}`}>
+        <div className={`h-[320px] w-full ${chartThemeClass}`}>
           <ResponsiveContainer width='100%' height='100%'>
             <LineChart data={data} margin={{ top: 10, right: 16, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray='3 3' vertical={false} />
@@ -209,7 +209,7 @@ function CollectionEfficiencyChart({ data }: { data: CollectionEfficiencyWeek[] 
         </CardTitle>
       </CardHeader>
       <CardContent className='pt-0'>
-        <div className={`h-[210px] w-full ${chartThemeClass}`}>
+        <div className={`h-[320px] w-full ${chartThemeClass}`}>
           <ResponsiveContainer width='100%' height='100%'>
             <LineChart data={data} margin={{ top: 10, right: 16, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray='3 3' vertical={false} />
@@ -276,16 +276,16 @@ function PerformerCards({
   lowPerformer: PerformerInfo | null;
 }) {
   return (
-    <Card className='shadow-sm transition-shadow hover:shadow-md h-full'>
+    <Card className='flex h-full flex-col shadow-sm transition-shadow hover:shadow-md'>
       <CardHeader className='pb-2'>
         <CardTitle className='text-sm font-semibold tracking-tight'>
           Best &amp; Needs Attention
         </CardTitle>
       </CardHeader>
-      <CardContent className='pt-0'>
-        <div className='grid grid-cols-2 gap-3'>
+      <CardContent className='flex-1 pt-0'>
+        <div className='grid h-full grid-cols-2 gap-3'>
           {/* Top Performer */}
-          <div className='flex flex-col items-center rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-center dark:border-emerald-800/40 dark:bg-emerald-950/20'>
+          <div className='flex flex-col items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-center dark:border-emerald-800/40 dark:bg-emerald-950/20'>
             <div className='mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40'>
               <IconTrophy className='h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400' />
             </div>
@@ -302,7 +302,7 @@ function PerformerCards({
           </div>
 
           {/* Low Performer */}
-          <div className='flex flex-col items-center rounded-lg border border-rose-200 bg-rose-50/50 p-3 text-center dark:border-rose-800/40 dark:bg-rose-950/20'>
+          <div className='flex flex-col items-center justify-center rounded-lg border border-rose-200 bg-rose-50/50 p-3 text-center dark:border-rose-800/40 dark:bg-rose-950/20'>
             <div className='mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/40'>
               <IconAlertTriangle className='h-4.5 w-4.5 text-rose-600 dark:text-rose-400' />
             </div>
@@ -332,18 +332,19 @@ export function ExecutiveDiagnosticWidgets({
   topPerformer,
   lowPerformer
 }: ExecutiveDiagnosticWidgetsProps) {
+  // Two rows of two for readability. `items-stretch` keeps the paired cards the
+  // same height (Best & Needs Attention matches Collection Efficiency). Stacks to
+  // a single column below `md`.
   return (
-    <div className='grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-12'>
-      <div className='lg:col-span-3'>
+    <div className='grid grid-cols-1 gap-4'>
+      {/* Row 1 — Overall Outstanding by Week + Weekly Momentum */}
+      <div className='grid grid-cols-1 items-stretch gap-4 md:grid-cols-2'>
         <OutstandingByWeekChart data={outstandingByWeek} />
-      </div>
-      <div className='lg:col-span-2'>
         <WeeklyMomentum data={momentumData} />
       </div>
-      <div className='lg:col-span-4'>
+      {/* Row 2 — Collection Efficiency Trend + Best & Needs Attention */}
+      <div className='grid grid-cols-1 items-stretch gap-4 md:grid-cols-2'>
         <CollectionEfficiencyChart data={collectionEfficiencyData} />
-      </div>
-      <div className='lg:col-span-3'>
         <PerformerCards topPerformer={topPerformer} lowPerformer={lowPerformer} />
       </div>
     </div>

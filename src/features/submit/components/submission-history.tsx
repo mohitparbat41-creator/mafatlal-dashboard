@@ -6,7 +6,12 @@ import { toast } from 'sonner';
 import { submissionsQueryOptions, submitKeys } from '../api/queries';
 import { deleteSubmission } from '../api/service';
 import { SubmissionRecord, DEPARTMENTS, departmentHead } from '../api/types';
-import { getCurrentWeekNumber, isWithinSalesWindow, SALES_WEEK_WINDOW } from '../api/weeks';
+import {
+  getCurrentWeekNumber,
+  isWithinSalesWindow,
+  salesWindowTargetIds,
+  SALES_WEEK_WINDOW
+} from '../api/weeks';
 import { SubmitForm } from './submit-form';
 import { useAuth } from '@/components/providers/supabase-auth-provider';
 import { formatINR } from '@/lib/format';
@@ -63,10 +68,20 @@ export function SubmissionHistory() {
   const queryClient = useQueryClient();
   const currentWeek = getCurrentWeekNumber();
 
-  // Sales scope the fetch to their own department server-side; management reads all.
-  const { data, isLoading, error } = useQuery(
-    submissionsQueryOptions(isManagement ? undefined : (department ?? undefined))
+  // Sales fetch is scoped server-side to their OWN department AND the trailing
+  // 3 business weeks (older rows are never queried from Supabase). Management
+  // reads all. A sales user with no department fetches nothing (enabled guard).
+  const salesWindowIds = useMemo(
+    () => (isManagement || !department ? undefined : salesWindowTargetIds(department, currentWeek)),
+    [isManagement, department, currentWeek]
   );
+  const { data, isLoading, error } = useQuery({
+    ...submissionsQueryOptions(
+      isManagement ? undefined : (department ?? undefined),
+      salesWindowIds
+    ),
+    enabled: isManagement || !!department
+  });
 
   const [search, setSearch] = useState('');
   const [weekFilter, setWeekFilter] = useState('all');

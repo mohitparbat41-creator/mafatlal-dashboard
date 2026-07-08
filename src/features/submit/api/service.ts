@@ -82,13 +82,14 @@ const weekFromTargetId = (id: string): number => {
 };
 
 /**
- * Submission history rows. When `departmentId` is given (sales role) the query is
- * scoped server-side to that department — a much smaller payload than the whole
- * table and a defence-in-depth guard that does not depend on RLS being live.
+ * Submission history rows. For the Sales role the caller passes `departmentId`
+ * AND `weeklyTargetIds` (the trailing 3-business-week IDs for that department),
+ * so the query is scoped server-side to just those weeks of that department —
+ * older rows are never fetched. Management omits both and reads all (capped).
  * `.limit` caps the result so a single navigation never streams the full table.
  */
 export async function fetchSubmissions(
-  opts: { departmentId?: string } = {}
+  opts: { departmentId?: string; weeklyTargetIds?: string[] } = {}
 ): Promise<SubmissionRecord[]> {
   const supabase = createClient();
   let query = supabase
@@ -101,6 +102,11 @@ export async function fetchSubmissions(
 
   if (opts.departmentId) {
     query = query.eq('department_id', opts.departmentId);
+  }
+  // Restrict to the trailing 3-week window server-side (sales). Old weeks are
+  // excluded by the database, not fetched-then-filtered in the browser.
+  if (opts.weeklyTargetIds && opts.weeklyTargetIds.length > 0) {
+    query = query.in('weekly_target_id', opts.weeklyTargetIds);
   }
 
   const { data, error } = await query;

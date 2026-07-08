@@ -105,3 +105,33 @@ export function isWithinSalesWindow(
 ): boolean {
   return weekNumber > currentWeek - SALES_WEEK_WINDOW;
 }
+
+/**
+ * The exact week numbers a Sales user may see/edit — the trailing window
+ * (current + the SALES_WEEK_WINDOW-1 prior weeks), e.g. [13, 14, 15] on Week 15.
+ * Used to scope the Supabase fetch so older rows are never even queried.
+ */
+export function salesWindowWeeks(currentWeek: number = getCurrentWeekNumber()): number[] {
+  const weeks: number[] = [];
+  for (let w = Math.max(1, currentWeek - SALES_WEEK_WINDOW + 1); w <= currentWeek; w++) {
+    weeks.push(w);
+  }
+  return weeks;
+}
+
+/**
+ * Build the `weekly_target_id` values a Sales department may access for the
+ * current window — both zero-padded and unpadded forms (W_D03_5 and W_D03_05)
+ * so the server `.in(...)` filter matches whatever format a row was stored in.
+ */
+export function salesWindowTargetIds(
+  departmentId: string,
+  currentWeek: number = getCurrentWeekNumber()
+): string[] {
+  const ids = new Set<string>();
+  for (const w of salesWindowWeeks(currentWeek)) {
+    ids.add(`W_${departmentId}_${w}`);
+    ids.add(`W_${departmentId}_${String(w).padStart(2, '0')}`);
+  }
+  return Array.from(ids);
+}

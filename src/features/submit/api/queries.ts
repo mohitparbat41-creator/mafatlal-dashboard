@@ -13,8 +13,12 @@ export const submitKeys = {
   // Prefix shared by every submissions variant so a single invalidate({ queryKey:
   // submitKeys.submissions() }) refreshes them all regardless of the department arg.
   submissions: () => [...submitKeys.all, 'submissions'] as const,
-  submissionsByDept: (departmentId?: string) =>
-    [...submitKeys.submissions(), departmentId ?? 'all'] as const,
+  submissionsByDept: (departmentId?: string, weeklyTargetIds?: string[]) =>
+    [
+      ...submitKeys.submissions(),
+      departmentId ?? 'all',
+      weeklyTargetIds ? weeklyTargetIds.join(',') : 'all-weeks'
+    ] as const,
   submittedWeeks: (departmentId?: string) =>
     [...submitKeys.all, 'submitted-weeks', departmentId ?? 'none'] as const
 };
@@ -40,10 +44,10 @@ export const activeNotificationQueryOptions = () => {
  * passes nothing and reads all. staleTime avoids a refetch when navigating
  * between /submit and /submit/history.
  */
-export const submissionsQueryOptions = (departmentId?: string) => {
+export const submissionsQueryOptions = (departmentId?: string, weeklyTargetIds?: string[]) => {
   return queryOptions({
-    queryKey: submitKeys.submissionsByDept(departmentId),
-    queryFn: () => fetchSubmissions({ departmentId }),
+    queryKey: submitKeys.submissionsByDept(departmentId, weeklyTargetIds),
+    queryFn: () => fetchSubmissions({ departmentId, weeklyTargetIds }),
     staleTime: 60_000
   });
 };
