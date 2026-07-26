@@ -36,6 +36,9 @@ import { Calendar } from '@/components/ui/calendar';
 import type { DateRange } from 'react-day-picker';
 import { useExecUiStore } from './executive-ui-store';
 import { DEPARTMENTS, departmentHead } from '@/features/submit/api/types';
+// Business-week calendar shared with the Sales Submission form — the dashboard
+// must never define its own week ranges.
+import { weekRangeLabel } from '@/features/submit/api/weeks';
 
 // Derived from the single canonical list so names/order never drift.
 const ALL_DEPARTMENTS = DEPARTMENTS.map((d) => d.name);
@@ -272,7 +275,9 @@ export function ExecutiveDashboard() {
       if (!chartDataMap.has(row.week_number)) {
         chartDataMap.set(row.week_number, {
           week_number: row.week_number,
-          date_range: row.date_range || `W${row.week_number}`,
+          // Label comes from the shared fiscal-week calendar, NOT the DB's
+          // date_range — so the chart and the Sales form always agree.
+          date_range: weekRangeLabel(row.week_number),
           weekly_target_amount: 0,
           total_sales_achieved: 0
         });
@@ -342,7 +347,7 @@ export function ExecutiveDashboard() {
       if (!outstandingWeekMap.has(row.week_number)) {
         outstandingWeekMap.set(row.week_number, {
           week_number: row.week_number,
-          date_range: row.date_range || `W${row.week_number}`,
+          date_range: weekRangeLabel(row.week_number),
           outstanding: 0
         });
       }
@@ -500,10 +505,9 @@ export function ExecutiveDashboard() {
       {/* ─── Header ──────────────────────────────────────────────────── */}
       <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
         <div>
-          <h1 className='text-2xl font-bold tracking-tight'>Executive Sales Overview</h1>
-          <p className='text-sm text-muted-foreground mt-0.5'>
-            Real-time performance dashboard for sales and collections
-          </p>
+          <h1 className='text-2xl font-bold tracking-tight'>
+            Mafatlal Business Snapshot Dashboard
+          </h1>
         </div>
 
         {/* Filters Row */}

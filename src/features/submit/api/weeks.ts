@@ -58,6 +58,25 @@ export const FISCAL_WEEKS = [
   'Week 53: 29-Mar to 31-Mar'
 ];
 
+/** Matches a FISCAL_WEEKS entry: "Week 1: 01-Apr to 05-Apr". */
+const WEEK_LABEL_RE = /^Week (\d+): (\d{2})-([A-Za-z]{3}) to (\d{2})-([A-Za-z]{3})$/;
+
+/**
+ * Compact date range for a business week — "01 Apr – 05 Apr".
+ * Used for dashboard chart x-axis labels so the graph and the Sales Entry
+ * form always describe the same weeks. Falls back to "W<n>" if out of range.
+ */
+export function weekRangeLabel(weekNumber: number): string {
+  const m = FISCAL_WEEKS[weekNumber - 1]?.match(WEEK_LABEL_RE);
+  return m ? `${m[2]} ${m[3]} – ${m[4]} ${m[5]}` : `W${weekNumber}`;
+}
+
+/** Full label for tooltips — "Week 1 · 01 Apr – 05 Apr". */
+export function weekFullLabel(weekNumber: number): string {
+  const range = weekRangeLabel(weekNumber);
+  return range === `W${weekNumber}` ? range : `Week ${weekNumber} · ${range}`;
+}
+
 const MONTHS: Record<string, number> = {
   Jan: 0,
   Feb: 1,
